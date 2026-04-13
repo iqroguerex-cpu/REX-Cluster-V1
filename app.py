@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.cluster import KMeans
+import os
 
 # --- UI CONFIGURATION ---
 st.set_page_config(
@@ -28,20 +29,27 @@ st.divider()
 
 # --- DATA HANDLING ---
 @st.cache_data
-def load_data(file):
-    df = pd.read_csv(file)
-    df.columns = df.columns.str.strip() # Clean hidden spaces in headers
+def load_data(file_path):
+    df = pd.read_csv(file_path)
+    df.columns = df.columns.str.strip() 
     return df
 
-uploaded_file = st.sidebar.file_uploader("Upload Mall_Customers.csv", type=["csv"])
-
-# Default columns for Mall_Customers.csv
+# LOGIC: Check if file exists in the repo folder, otherwise show uploader
+FILE_NAME = "Mall_Customers.csv"
 INCOME_COL = "Annual Income (k$)"
 SPENDING_COL = "Spending Score (1-100)"
 
-if uploaded_file is not None:
-    df = load_data(uploaded_file)
-    
+if os.path.exists(FILE_NAME):
+    df = load_data(FILE_NAME)
+    st.sidebar.success(f"✅ Loaded: {FILE_NAME} from Repository")
+else:
+    uploaded_file = st.sidebar.file_uploader("Upload Mall_Customers.csv", type=["csv"])
+    if uploaded_file:
+        df = load_data(uploaded_file)
+    else:
+        df = None
+
+if df is not None:
     # Check if required columns exist
     if INCOME_COL in df.columns and SPENDING_COL in df.columns:
         X = df[[INCOME_COL, SPENDING_COL]].values
@@ -70,7 +78,6 @@ if uploaded_file is not None:
                 st.dataframe(df[[INCOME_COL, SPENDING_COL, 'Cluster']].head(10))
 
         with col2:
-            # Interactive Plotly Chart
             fig = px.scatter(
                 df, 
                 x=INCOME_COL, 
@@ -79,10 +86,9 @@ if uploaded_file is not None:
                 hover_data=['Gender', 'Age'], 
                 template="plotly_dark",
                 title=f"Customer Distribution (K={k_value})",
-                color_discrete_sequence=["#00FFD1", "#FF00E4", "#00D1FF", "#8A2BE2", "#ADFF2F", "#FFA500"]
+                color_discrete_sequence=["#00FFD1", "#FF00E4", "#00D1FF", "#8A2BE2", "#ADFF2F"]
             )
             
-            # Mapping Centroids
             centroids = kmeans.cluster_centers_
             fig.add_trace(go.Scatter(
                 x=centroids[:, 0], y=centroids[:, 1],
@@ -91,33 +97,17 @@ if uploaded_file is not None:
                 name='Centroids'
             ))
             
-            fig.update_layout(
-                legend_title_text='Market Segments',
-                font=dict(family="Courier New, monospace", color="#FFFFFF")
-            )
+            fig.update_layout(legend_title_text='Market Segments')
             st.plotly_chart(fig, use_container_width=True)
 
-        # --- OPTIONAL ELBOW ANALYSIS ---
         if show_elbow:
             st.divider()
-            st.subheader("Optimization Logic (Elbow Method)")
-            wcss = []
-            for i in range(1, 11):
-                km = KMeans(n_clusters=i, init='k-means++', random_state=42)
-                km.fit(X)
-                wcss.append(km.inertia_)
-            
-            elbow_fig = px.line(
-                x=list(range(1, 11)), y=wcss, 
-                markers=True, 
-                template="plotly_dark",
-                labels={'x': 'Number of Clusters', 'y': 'WCSS'},
-                title="Within-Cluster Sum of Squares"
-            )
+            wcss = [KMeans(n_clusters=i, init='k-means++', random_state=42).fit(X).inertia_ for i in range(1, 11)]
+            elbow_fig = px.line(x=list(range(1, 11)), y=wcss, markers=True, template="plotly_dark", title="Elbow Analysis")
             elbow_fig.update_traces(line_color='#00FFD1')
             st.plotly_chart(elbow_fig, use_container_width=True)
 
     else:
-        st.error(f"Error: Could not find columns '{INCOME_COL}' and '{SPENDING_COL}'. Please check your CSV headers.")
+        st.error("Column mismatch in CSV.")
 else:
-    st.info("System Standby. Please upload 'Mall_Customers.csv' to initialize segment mapping.")
+    st.warning("Awaiting dataset. Please ensure Mall_Customers.csv is in the repository.")
