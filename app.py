@@ -66,6 +66,7 @@ if df is not None:
             df, x=df.columns[3], y=df.columns[4], color='Cluster',
             hover_data=['Gender', 'Age'], 
             template="plotly_dark",
+            # Using a custom neon palette for the stealth look
             color_discrete_sequence=["#00FFD1", "#FF00E4", "#00D1FF", "#8A2BE2", "#ADFF2F"]
         )
         
